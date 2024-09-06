@@ -17,7 +17,7 @@ public class PersonaConvertidor {
                   ,dto.getDireccion(), dto.getGeo(), dto.getGenero(), dto.getPais(), dto.getCreatedAt());
     }
 
-    public static PersonaDTO aEntidad(Persona entidad) {
+    public static PersonaDTO aDto (Persona entidad) {
         if (entidad == null) {
             return null;
         }

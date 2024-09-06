@@ -7,7 +7,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**

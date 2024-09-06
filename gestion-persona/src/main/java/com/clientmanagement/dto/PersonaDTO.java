@@ -1,6 +1,5 @@
 package com.clientmanagement.dto;
 
-import com.clientmanagement.conversores.CreditosDeserializador;
 import com.clientmanagement.conversores.GeoDeserializador;
 import com.clientmanagement.conversores.InstantDeserializador;
 import com.fasterxml.jackson.annotation.JsonAlias;
@@ -10,6 +9,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.persistence.Column;
 import java.time.Instant;
 import java.util.List;
+
 /**
  * DTO para la entidad persona
  *
@@ -24,8 +24,6 @@ public class PersonaDTO {
     
     private String email;
     
-    //Venga con tipo String o null  se parsea a integer si es null va a ser 0.
-    //@JsonDeserialize(using = CreditosDeserializador.class)
    @JsonAlias({"créditos", "creditos"}) // con esta anotacion reconoce ambos nombre de campo
     private Integer creditos;
     
@@ -133,8 +131,4 @@ public class PersonaDTO {
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
-
-   
-
-
 }

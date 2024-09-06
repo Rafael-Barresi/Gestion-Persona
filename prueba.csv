@@ -1,0 +1,6 @@
+id,nombre,email,creditos,direccion,geoLat,geoLong,genero,pais,createdAt
+8,Albus Domledor,mail@mail.com,1355, , , ,female,brazil
+9,Harry Potter,harry@mail.com,12,Privet Drive 4,-70.1235,90.3211,female,UK,2024-06-12T20:59:29.462Z
+7,Ron Wisly,ron@mail.com,1286,La madriguera 12,12.3456,65.4321,male,UK,2024-07-02T11:30:00.000Z
+21,Vicyor Krum,quidditch@snitch.org,55,,,,xxxx,Bulgaria,2024-08-13T14:01:24.593093800Z
+101,xxxxx,aaa@mail.com,1234,

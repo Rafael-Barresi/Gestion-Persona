@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -36,6 +37,8 @@ public class PersonaServicio {
     private CrmApiServicio crmApiServicio;
     @Autowired
     private PersonaRepositorio personaRepositorio;
+    @Autowired
+    private TransaccionServicio transaccionServicio;
     //private static final Logger logger = Logger.getLogger(PersonaServicio.class.getName());
     private final static Logger logger = LogConfig.getLogger(PersonaServicio.class.getName());
 
@@ -177,8 +180,13 @@ public class PersonaServicio {
         }
     }
 
-    //El campo geo en la api puede ser un []String o []Double se manejan los dos casos.
-    //si El campo creditos obtenido de la API es un String mediantde deserializador se parsea a Integer
+    /**
+     * Recibe lista de PersonasDTO compara contra la API (FUENTE DE VERDAD) si
+     * existe en la base de datos comparado por ID se ignora, Si existe en se
+     * CRM API se actualiza y se guarda en la base de datos
+     *
+     * @param personasCSV
+     */
     @Transactional
     public void sincronizarDatos(List<PersonaDTO> personasCSV) {
 
@@ -193,13 +201,13 @@ public class PersonaServicio {
                 }
 
                 String respuestaApi = crmApiServicio.getPersonaById(personaCsv.getId());
-              
+
                 if (respuestaApi != null) {
 
                     PersonaDTO personaApi = mapper.readValue(respuestaApi,
                             new TypeReference<PersonaDTO>() {
                     });
-        
+
                     if (!personaCsv.getNombre().equals(personaApi.getNombre())) {
                         personaCsv.setNombre(personaApi.getNombre());
                     }
@@ -209,27 +217,27 @@ public class PersonaServicio {
                     if (!personaCsv.getCreditos().equals(personaApi.getCreditos())) {
                         personaCsv.setCreditos(personaApi.getCreditos());
                     }
-                    if (personaCsv.getDireccion() != null && !personaCsv.getDireccion().equals(personaApi.getDireccion())) {
+                    if (personaCsv.getDireccion() == null || !personaCsv.getDireccion().equals(personaApi.getDireccion())) {
                         personaCsv.setDireccion(personaApi.getDireccion());
-                    } else{
+                    } else {
                         personaCsv.setDireccion(null);
                     }
-                    if (personaCsv.getGeo() != null && !personaCsv.getGeo().equals(personaApi.getGeo())) {
+                    if (personaCsv.getGeo() == null || !personaCsv.getGeo().equals(personaApi.getGeo())) {
                         personaCsv.setGeo(personaApi.getGeo());
                     } else {
                         personaCsv.setGeo(null);
                     }
-                    if (personaCsv.getGenero() != null && !personaCsv.getGenero().equals(personaApi.getGenero())) {
+                    if (personaCsv.getGenero() == null || !personaCsv.getGenero().equals(personaApi.getGenero())) {
                         personaCsv.setGenero(personaApi.getGenero());
                     } else {
                         personaCsv.setGenero(null);
                     }
-                    if (personaCsv.getPais() != null && !personaCsv.getPais().equals(personaApi.getPais())) {
+                    if (personaCsv.getPais() == null || !personaCsv.getPais().equals(personaApi.getPais())) {
                         personaCsv.setPais(personaApi.getPais());
                     } else {
                         personaCsv.setPais(null);
                     }
-                    if (personaCsv.getCreatedAt() != null && !personaCsv.getCreatedAt().equals(personaApi.getCreatedAt())) {
+                    if (personaCsv.getCreatedAt() == null || !personaCsv.getCreatedAt().equals(personaApi.getCreatedAt())) {
                         personaCsv.setCreatedAt(personaApi.getCreatedAt());
                     } else {
                         personaCsv.setCreatedAt(null);
@@ -253,35 +261,66 @@ public class PersonaServicio {
     }
 
     /**
-     * Procesa la respuesta de la llamada a la API y devuelve una lista de
-     * personaDTO
-     *
-     * @return
+     *valida y genera una transferencia se persisten datos en transaccion
+     * se persisten los cambios en las personas.
+     * @param idEmisor
+     * @param creditos
+     * @param idReceptor
+     * @throws Exception
      */
-   /* public List<PersonaDTO> procesarRespuestaCrm() {
+    @Transactional
+    public void transferenciaCreditos(
+            String idEmisor, Integer creditos, String idReceptor) throws Exception {
 
-        //Llama ala API  obtiene respuesta
-        Optional<String> resultadoAPI = crmApiServicio.getAllPersonas();
+        if (creditos == null || creditos <= 0) {
+            throw new IllegalArgumentException("ERROR: La cantidad de créditos debe ser mayor que cero.");
+        }
+        Optional<Persona> respuestaEmisor = personaRepositorio.findById(idEmisor);
+        Optional<Persona> respuestaReceptor = personaRepositorio.findById(idReceptor);
 
-        if (resultadoAPI.isPresent()) {
-            String respuestaJson = resultadoAPI.get();
+        Persona emisor;
+        Persona receptor;
 
-            try {
-
-                //Mapeo el Json en una lista de objetos
-                List<PersonaDTO> personas = mapper.readValue(respuestaJson, new TypeReference<List<PersonaDTO>>() {
-                });
-                System.out.println(" ");
-                System.out.println("PERSONAS EXISTENTES EN ProcesarRespuestaCrm :   " + personas.size());
-                return personas;
-            } catch (JsonProcessingException e) {
-                logger.log(Level.SEVERE, "ERROR al procesar  JSON a persona DTO: {0}", e.getMessage());
-            }
+        if (respuestaEmisor.isPresent()) {
+            emisor = respuestaEmisor.get();
         } else {
-            logger.log(Level.WARNING, "No se obtuvo lista de personas de getAllPersonas");
+            logger.log(Level.SEVERE, "EL emisor con ID: {} no existe en la Base de datos.", idEmisor);
+            throw new IllegalArgumentException("ERROR el emisor no existe en la base de datos");
         }
 
-        return new ArrayList();
+        if (emisor.getCreditos() < creditos) {
+            logger.log(Level.SEVERE, "EL emisor con ID: {} no posee creditos suficientes", idEmisor);
+            throw new IllegalArgumentException("ERROR el emisor con ID: {0} no posee creditos suficientes");
+        }
+
+        if (respuestaReceptor.isPresent()) {
+            receptor = respuestaReceptor.get();
+            if (receptor.getCreditos() == null) {
+                receptor.setCreditos(0);
+            }
+
+        } else {
+            logger.log(Level.SEVERE, "EL receptor con ID: {} no existe en la Base de datos.", idReceptor);
+            throw new IllegalArgumentException("ERROR el receptor no existe en la base de datos");
+        }
+
+        emisor.setCreditos(emisor.getCreditos() - creditos);
+        receptor.setCreditos(receptor.getCreditos() + creditos);
+
+        try {
+            personaRepositorio.save(emisor);
+            personaRepositorio.save(receptor);
+            transaccionServicio.transaccionNueva(creditos);
+
+        } catch (DataAccessException e) {
+            logger.log(Level.SEVERE, "ERROR al guardar persona en base de datos", e);
+            throw new RuntimeException("ERROR al persistir persona. ", e);
+
+        } catch (RuntimeException e) {
+            logger.log(Level.SEVERE, "ERROR al realizar la transaccion ");
+            throw e;
+        }
+
     }
-*/
+
 }
